@@ -23,6 +23,7 @@ defmodule Chromesmith do
   * `:page_pool_size` - How many pages to open per chrome instance
   """
   use GenServer
+  alias ChromeRemoteInterface.{Session, PageSession}
 
   defstruct [
     supervisor: nil, # Chromesmith.Supervisor PID
@@ -61,6 +62,10 @@ defmodule Chromesmith do
     GenServer.cast(pid, {:checkin, worker})
   end
 
+  def purge(pid, worker) do
+    GenServer.cast(pid, {:purge, worker})
+  end
+
   # ---
   # Private
   # ---
@@ -95,7 +100,7 @@ defmodule Chromesmith do
     {:ok, %{state | process_pools: process_pools}}
   end
 
-  def spawn_pools(supervisor, state) do
+  def spawn_pools(supervisor, state) do[ManyE]
     children =
       Enum.map(1..state.process_pool_size, fn(index) ->
         start_worker(supervisor, index, state)
@@ -119,11 +124,11 @@ defmodule Chromesmith do
       }
     )
 
-    page_pids =
+    {session, page_pids} =
       child
       |> Chromesmith.Worker.start_pages([page_pool_size: state.page_pool_size])
 
-    {child, page_pids, page_pids}
+    {child, page_pids, page_pids, session}
   end
 
   # ---
@@ -133,10 +138,10 @@ defmodule Chromesmith do
   def handle_call({:checkout, should_block}, from, state) do
     {updated_pools, page} =
       state.process_pools
-      |> Enum.reduce({[], nil}, fn({pid, available_pages, total_pages} = pool, {pools, found_page}) ->
+      |> Enum.reduce({[], nil}, fn({pid, available_pages, total_pages, session} = pool, {pools, found_page}) ->
         if is_nil(found_page) and length(available_pages) > 0 do
           [checked_out_page | new_pages] = available_pages
-          new_pool = {pid, new_pages, total_pages}
+          new_pool = {pid, new_pages, total_pages, session}
           {[new_pool | pools], checked_out_page}
         else
           {[pool | pools], found_page}
@@ -166,19 +171,60 @@ defmodule Chromesmith do
       {:empty, _} ->
         updated_pools =
           state.process_pools
-          |> Enum.map(fn({pid, available_pages, total_pages} = pool) ->
+          |> Enum.map(fn({pid, available_pages, total_pages, session} = pool) ->
             # If this page is from this pool, (part of total pages)
             # then return it as an available page only if it hasn't
             # been added before (not already checked into available_pages
 
             if Enum.find(total_pages, &(&1 == page)) && !Enum.find(available_pages, &(&1 == page)) do
-              {pid, [page | available_pages], total_pages}
+              {pid, [page | available_pages], total_pages, session}
             else
               pool
             end
           end)
 
         {:noreply, %{state | process_pools: updated_pools}}
+    end
+  end
+
+  def handle_cast({:purge, page}, state) do
+    updated_pools =
+      state.process_pools
+      |> Enum.map(fn({pid, _available_pages, total_pages, session} = pool) ->
+        # If this page is from this pool, (part of total pages)
+        # then return it as an available page only if it hasn't
+        # been added before (not already checked into available_pages
+
+        if Enum.find(total_pages, &(&1 == page)) do
+          {:ok, page} = Session.new_page(session)
+          {:ok, page_session} = PageSession.start_link(page)
+
+          {pid, [page_session], [page_session], session}
+        else
+          pool
+        end
+      end)
+
+    new_state = %{state | process_pools: updated_pools}
+
+    case :queue.out(state.checkout_queue) do
+      {{:value, ref}, new_queue} ->
+        {updated_pools, page} =
+          new_state.process_pools
+          |> Enum.reduce({[], nil}, fn({pid, available_pages, total_pages, session} = pool, {pools, found_page}) ->
+            if is_nil(found_page) and length(available_pages) > 0 do
+              [checked_out_page | new_pages] = available_pages
+              new_pool = {pid, new_pages, total_pages, session}
+              {[new_pool | pools], checked_out_page}
+            else
+              {[pool | pools], found_page}
+            end
+          end)
+        GenServer.reply(ref, {:ok, page})
+        new_state = %{new_state | checkout_queue: new_queue}
+        {:noreply, %{new_state | process_pools: updated_pools}}
+      {:empty, _} ->
+        {:noreply, new_state}
     end
   end
 end

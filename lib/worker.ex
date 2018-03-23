@@ -48,7 +48,7 @@ defmodule Chromesmith.Worker do
     page_sessions = spawn_pages(session, opts[:page_pool_size])
     all_page_sessions = [initial_page_session | page_sessions]
 
-    {:reply, all_page_sessions, %{state | page_sessions: all_page_sessions}}
+    {:reply, {session, all_page_sessions}, %{state | page_sessions: all_page_sessions}}
   end
 
   def spawn_pages(session, number_of_pages)
