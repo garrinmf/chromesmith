@@ -26,7 +26,7 @@ defmodule Chromesmith.Mixfile do
   defp deps do
     [
       {:chrome_launcher, "~> 0.0.1"},
-      {:chrome_remote_interface, "~> 0.0.2"},
+      {:chrome_remote_interface, github: "garrinmf/chrome-remote-interface", branch: "master"},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
