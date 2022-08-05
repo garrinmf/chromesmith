@@ -47,12 +47,12 @@ defmodule Chromesmith do
   Check out a Page from one of the headless chrome processes.
   """
   @spec checkout(pid(), boolean()) :: {:ok, pid()} | {:error, :none_available} | {:error, :timeout}
-  def checkout(pid, should_block \\ false)
-  def checkout(pid, false) do
+  def checkout(pid, should_block \\ false, timeout \\ :infinity)
+  def checkout(pid, false, _) do
     GenServer.call(pid, {:checkout, false})
   end
-  def checkout(pid, true) do
-    GenServer.call(pid, {:checkout, true}, :infinity)
+  def checkout(pid, true, timeout) do
+    GenServer.call(pid, {:checkout, true}, timeout)
   end
 
   @doc """
