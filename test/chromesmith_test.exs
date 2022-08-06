@@ -19,4 +19,10 @@ defmodule ChromesmithTest do
     assert {:error, :none_available} == Chromesmith.checkout(context[:pool_pid], false)
     assert :ok == Chromesmith.checkin(context[:pool_pid], pid)
   end
+
+  test "Calling info returns state", context do
+    {:ok, state} = Chromesmith.info(context[:pool_pid])
+
+    assert :queue.len(state.checkout_queue) == 0
+  end
 end

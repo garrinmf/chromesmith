@@ -66,6 +66,10 @@ defmodule Chromesmith do
     GenServer.cast(pid, {:purge, worker})
   end
 
+  def info(pid) do
+    GenServer.call(pid, {:info})
+  end
+
   # ---
   # Private
   # ---
@@ -134,6 +138,10 @@ defmodule Chromesmith do
   # ---
   # GenServer Handlers
   # ----
+
+  def handle_call({:info}, _from, state) do
+    {:reply, {:ok, state} }
+  end
 
   def handle_call({:checkout, should_block}, from, state) do
     {updated_pools, page} =
