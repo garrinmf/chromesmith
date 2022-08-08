@@ -6,7 +6,7 @@ defmodule Chromesmith.Mixfile do
       app: :chromesmith,
       version: "0.0.1",
       elixir: "~> 1.5",
-      start_permanent: Mix.env == :prod,
+      start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "Chromesmith",
       source_url: "https://github.com/andrewvy/chromesmith",

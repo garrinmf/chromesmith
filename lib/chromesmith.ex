@@ -26,31 +26,38 @@ defmodule Chromesmith do
   alias ChromeRemoteInterface.{Session, PageSession}
 
   defstruct [
-    supervisor: nil, # Chromesmith.Supervisor PID
-    process_pool_size: 0, # How many Headless Chrome instances to spawn
-    page_pool_size: 0, # How many Pages per Instance
-    process_pools: [], # List of process pool tuples, {pid, available_pids, all_pids}
+    # Chromesmith.Supervisor PID
+    supervisor: nil,
+    # How many Headless Chrome instances to spawn
+    process_pool_size: 0,
+    # How many Pages per Instance
+    page_pool_size: 0,
+    # List of process pool tuples, {pid, available_pids, all_pids}
+    process_pools: [],
     chrome_options: [],
     checkout_queue: :queue.new()
   ]
 
   @type t :: %__MODULE__{
-    supervisor: pid(),
-    process_pool_size: non_neg_integer(),
-    page_pool_size: non_neg_integer(),
-    process_pools: [{pid(), [pid()], [pid()]}],
-    chrome_options: list(),
-    checkout_queue: :queue.queue()
-  }
+          supervisor: pid(),
+          process_pool_size: non_neg_integer(),
+          page_pool_size: non_neg_integer(),
+          process_pools: [{pid(), [pid()], [pid()]}],
+          chrome_options: list(),
+          checkout_queue: :queue.queue()
+        }
 
   @doc """
   Check out a Page from one of the headless chrome processes.
   """
-  @spec checkout(pid(), boolean()) :: {:ok, pid()} | {:error, :none_available} | {:error, :timeout}
+  @spec checkout(pid(), boolean()) ::
+          {:ok, pid()} | {:error, :none_available} | {:error, :timeout}
   def checkout(pid, should_block \\ false, timeout \\ :infinity)
+
   def checkout(pid, false, _) do
     GenServer.call(pid, {:checkout, false})
   end
+
   def checkout(pid, true, timeout) do
     GenServer.call(pid, {:checkout, true}, timeout)
   end
@@ -104,9 +111,11 @@ defmodule Chromesmith do
     {:ok, %{state | process_pools: process_pools}}
   end
 
-  def spawn_pools(supervisor, state) do[ManyE]
+  def spawn_pools(supervisor, state) do
+    [ManyE]
+
     children =
-      Enum.map(1..state.process_pool_size, fn(index) ->
+      Enum.map(1..state.process_pool_size, fn index ->
         start_worker(supervisor, index, state)
       end)
 
@@ -114,23 +123,26 @@ defmodule Chromesmith do
   end
 
   def start_worker(supervisor, index, state) do
-    {:ok, child} = Supervisor.start_child(
-      supervisor,
-      %{
-        id: index,
-        start: {Chromesmith.Worker, :start_link, [
-          index,
-          state.chrome_options
-        ]},
-        restart: :permanent,
-        shutdown: 5000,
-        type: :worker
-      }
-    )
+    {:ok, child} =
+      Supervisor.start_child(
+        supervisor,
+        %{
+          id: index,
+          start:
+            {Chromesmith.Worker, :start_link,
+             [
+               index,
+               state.chrome_options
+             ]},
+          restart: :permanent,
+          shutdown: 5000,
+          type: :worker
+        }
+      )
 
     {session, page_pids} =
       child
-      |> Chromesmith.Worker.start_pages([page_pool_size: state.page_pool_size])
+      |> Chromesmith.Worker.start_pages(page_pool_size: state.page_pool_size)
 
     {child, page_pids, page_pids, session}
   end
@@ -140,13 +152,14 @@ defmodule Chromesmith do
   # ----
 
   def handle_call({:info}, _from, state) do
-    {:reply, {:ok, state} }
+    {:reply, {:ok, state}, state}
   end
 
   def handle_call({:checkout, should_block}, from, state) do
     {updated_pools, page} =
       state.process_pools
-      |> Enum.reduce({[], nil}, fn({pid, available_pages, total_pages, session} = pool, {pools, found_page}) ->
+      |> Enum.reduce({[], nil}, fn {pid, available_pages, total_pages, session} = pool,
+                                   {pools, found_page} ->
         if is_nil(found_page) and length(available_pages) > 0 do
           [checked_out_page | new_pages] = available_pages
           new_pool = {pid, new_pages, total_pages, session}
@@ -176,10 +189,11 @@ defmodule Chromesmith do
       {{:value, ref}, new_queue} ->
         GenServer.reply(ref, {:ok, page})
         {:noreply, %{state | checkout_queue: new_queue}}
+
       {:empty, _} ->
         updated_pools =
           state.process_pools
-          |> Enum.map(fn({pid, available_pages, total_pages, session} = pool) ->
+          |> Enum.map(fn {pid, available_pages, total_pages, session} = pool ->
             # If this page is from this pool, (part of total pages)
             # then return it as an available page only if it hasn't
             # been added before (not already checked into available_pages
@@ -198,7 +212,7 @@ defmodule Chromesmith do
   def handle_cast({:purge, page}, state) do
     updated_pools =
       state.process_pools
-      |> Enum.map(fn({pid, _available_pages, total_pages, session} = pool) ->
+      |> Enum.map(fn {pid, _available_pages, total_pages, session} = pool ->
         # If this page is from this pool, (part of total pages)
         # then return it as an available page only if it hasn't
         # been added before (not already checked into available_pages
@@ -219,7 +233,8 @@ defmodule Chromesmith do
       {{:value, ref}, new_queue} ->
         {updated_pools, page} =
           new_state.process_pools
-          |> Enum.reduce({[], nil}, fn({pid, available_pages, total_pages, session} = pool, {pools, found_page}) ->
+          |> Enum.reduce({[], nil}, fn {pid, available_pages, total_pages, session} = pool,
+                                       {pools, found_page} ->
             if is_nil(found_page) and length(available_pages) > 0 do
               [checked_out_page | new_pages] = available_pages
               new_pool = {pid, new_pages, total_pages, session}
@@ -228,9 +243,11 @@ defmodule Chromesmith do
               {[pool | pools], found_page}
             end
           end)
+
         GenServer.reply(ref, {:ok, page})
         new_state = %{new_state | checkout_queue: new_queue}
         {:noreply, %{new_state | process_pools: updated_pools}}
+
       {:empty, _} ->
         {:noreply, new_state}
     end

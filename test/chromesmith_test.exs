@@ -4,7 +4,7 @@ defmodule ChromesmithTest do
   doctest Chromesmith
 
   setup_all do
-    {:ok, pid} = Chromesmith.start_link([process_pool_size: 1, page_pool_size: 1])
+    {:ok, pid} = Chromesmith.start_link(process_pool_size: 1, page_pool_size: 1)
     [pool_pid: pid]
   end
 

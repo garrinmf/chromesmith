@@ -9,6 +9,7 @@ defmodule Chromesmith.Worker do
 
   def init({index, chrome_options}) do
     default_opts = ChromeLauncher.default_opts()
+
     default_flags =
       default_opts
       |> Keyword.get(:flags)
@@ -37,9 +38,7 @@ defmodule Chromesmith.Worker do
   end
 
   def handle_call({:start_pages, opts}, _from, state) do
-    session = Session.new([
-      port: state.opts[:remote_debugging_port]
-    ])
+    session = Session.new(port: state.opts[:remote_debugging_port])
 
     # Headless Chrome will start with an initial page, so we will
     # need to retrieve it in order to connect to it.
@@ -53,8 +52,9 @@ defmodule Chromesmith.Worker do
 
   def spawn_pages(session, number_of_pages)
   def spawn_pages(_session, 1), do: []
+
   def spawn_pages(session, number_of_pages) do
-    Enum.map(1..number_of_pages - 1, fn(_) ->
+    Enum.map(1..(number_of_pages - 1), fn _ ->
       {:ok, page} = Session.new_page(session)
       {:ok, page_session} = PageSession.start_link(page)
       page_session
