@@ -40,9 +40,24 @@ defmodule Chromesmith.Worker do
   def handle_call({:start_pages, opts}, _from, state) do
     session = Session.new(port: state.opts[:remote_debugging_port])
 
-    # Headless Chrome will start with an initial page, so we will
+    # Headless Chrome _SHOULD_ start with an initial page, so we will
     # need to retrieve it in order to connect to it.
-    {:ok, [initial_page]} = Session.list_pages(session)
+    # If it doesn't, try and get one going
+    initial_page = case Session.list_pages(session) do
+      {:ok, [page]} ->
+        page
+      {:ok, []} ->
+        IO.puts("Started without an initial Page")
+        {:ok, page} = Session.new_page(session)
+        page
+      unknown ->
+        IO.inspect(unknown)
+        {:ok, page} = Session.new_page(session)
+        page
+    end
+
+
+
     {:ok, initial_page_session} = PageSession.start_link(initial_page)
     page_sessions = spawn_pages(session, opts[:page_pool_size])
     all_page_sessions = [initial_page_session | page_sessions]
