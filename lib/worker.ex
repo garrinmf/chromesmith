@@ -48,11 +48,11 @@ defmodule Chromesmith.Worker do
         page
       {:ok, []} ->
         IO.puts("Started without an initial Page")
-        {:ok, page} = Session.new_page(session)
+        {:ok, page} = handle_start_page(session)
         page
       unknown ->
         IO.inspect(unknown)
-        {:ok, page} = Session.new_page(session)
+        {:ok, page} = handle_start_page(session)
         page
     end
 
@@ -63,6 +63,22 @@ defmodule Chromesmith.Worker do
     all_page_sessions = [initial_page_session | page_sessions]
 
     {:reply, {session, all_page_sessions}, %{state | page_sessions: all_page_sessions}}
+  end
+
+  def handle_start_page(session) do
+    case Session.new_page(session) do
+      {:ok, page} ->
+        IO.puts("GOT A PAGE")
+        {:ok, page}
+      {a, b} ->
+        IO.puts("GOT SOMETHING")
+        IO.inspect(a)
+        IO.inspect(b)
+        {a, b}
+      unknown ->
+        IO.puts("GOT UNKNOWN")
+        IO.inspect(unknown)
+    end
   end
 
   def spawn_pages(session, number_of_pages)
